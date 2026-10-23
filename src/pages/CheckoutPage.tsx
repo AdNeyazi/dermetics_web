@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   cartSubtotal,
@@ -11,6 +11,7 @@ import {
 import { placeOrder, validateCoupon } from '@/lib/checkout'
 import { formatMoney } from '@/lib/money'
 import { trackEvent } from '@/lib/track'
+import { trackBeginCheckout, trackApplyCoupon, trackPurchase } from '@/lib/gtag'
 import { useAuth } from '@/context/AuthContext'
 import type { CartLine, AppliedCoupon } from '@/types'
 
@@ -48,10 +49,27 @@ export function CheckoutPage() {
     paymentMethod: 'cod',
   })
 
+  const hasTrackedCheckoutRef = useRef(false)
+
   useEffect(() => {
     const sync = () => {
-      setLines(readCart())
+      const currentLines = readCart()
+      setLines(currentLines)
       setCoupon(readAppliedCoupon())
+      if (currentLines.length > 0 && !hasTrackedCheckoutRef.current) {
+        hasTrackedCheckoutRef.current = true
+        trackBeginCheckout({
+          items: currentLines.map((l) => ({
+            item_id: String(l.productId),
+            item_name: l.name,
+            price: Number(l.price),
+            quantity: Number(l.quantity) || 1,
+            item_variant: l.variantLabel,
+          })),
+          value: cartSubtotal(currentLines),
+          coupon: readAppliedCoupon()?.code,
+        })
+      }
     }
     sync()
     return subscribeCart(sync)
@@ -81,6 +99,7 @@ export function CheckoutPage() {
       saveAppliedCoupon(payload)
       setCoupon(payload)
       trackEvent('coupon_applied', { code: payload.code, page: '/checkout' })
+      trackApplyCoupon({ coupon_code: payload.code, discount: data.discount })
     } catch (e: unknown) {
       setCouponErr(e instanceof Error ? e.message : 'Coupon validation failed')
     }
@@ -99,6 +118,20 @@ export function CheckoutPage() {
         paymentMethod: form.paymentMethod,
       })
       trackEvent('checkout_complete', { orderId: order.id, total: order.total, payment: form.paymentMethod })
+      trackPurchase({
+        transaction_id: String(order.id),
+        value: Number(order.total || total),
+        shipping: Number(order.shipping ?? shipping),
+        coupon: coupon?.code,
+        payment_type: form.paymentMethod,
+        items: lines.map((l) => ({
+          item_id: String(l.productId),
+          item_name: l.name,
+          price: Number(l.price),
+          quantity: Number(l.quantity) || 1,
+          item_variant: l.variantLabel,
+        })),
+      })
       clearCart()
       saveAppliedCoupon(null)
       setOrderId(order.id)

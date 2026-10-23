@@ -1,3 +1,5 @@
+import { trackApiPerformance } from './gtag'
+
 export function getApiBase(): string {
   const raw = import.meta.env?.VITE_API_URL
   if (!raw || raw === 'same-origin') return ''
@@ -20,13 +22,41 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     authHeaders['Authorization'] = `Bearer ${token}`
   }
 
-  return fetch(apiUrl(path), {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders,
-      ...(headers as Record<string, string>),
-    },
-    ...rest,
-  })
+  const start = typeof performance !== 'undefined' ? performance.now() : Date.now()
+
+  try {
+    const res = await fetch(apiUrl(path), {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+        ...(headers as Record<string, string>),
+      },
+      ...rest,
+    })
+
+    const duration = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - start
+    // Don't recurse on analytics endpoints
+    if (!path.includes('analytics')) {
+      trackApiPerformance({
+        endpoint: path,
+        duration_ms: duration,
+        status: res.status,
+        ok: res.ok,
+      })
+    }
+
+    return res
+  } catch (err) {
+    const duration = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - start
+    if (!path.includes('analytics')) {
+      trackApiPerformance({
+        endpoint: path,
+        duration_ms: duration,
+        status: 0,
+        ok: false,
+      })
+    }
+    throw err
+  }
 }

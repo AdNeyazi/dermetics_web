@@ -175,7 +175,7 @@ function Overview() {
 function Products() {
   const [items, setItems] = useState<Product[]>([])
   const [q, setQ] = useState('')
-  const [editing, setEditing] = useState<any | null>(null)
+  const [editing, setEditing] = useState<Partial<Product> | null>(null)
   const [loadingEdit, setLoadingEdit] = useState(false)
   const load = useCallback(() => { api('/api/products').then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {}) }, [])
   useEffect(() => { load() }, [load])
@@ -193,7 +193,7 @@ function Products() {
     }
   }
 
-  const save = async (payload: any) => {
+  const save = async (payload: Record<string, unknown>) => {
     const isNew = !payload.id
     await api(isNew ? '/api/admin/products' : `/api/admin/products/${payload.id}`, {
       method: isNew ? 'POST' : 'PUT',
@@ -212,60 +212,145 @@ function Products() {
 
   const filtered = items.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()) || (p.tag || '').toLowerCase().includes(q.toLowerCase()))
 
+  if (editing) {
+    return (
+      <ProductEditor
+        product={editing}
+        allProducts={items}
+        onClose={() => setEditing(null)}
+        onSave={save}
+      />
+    )
+  }
+
   return (
     <div>
       <div className="dash-toolbar">
-        <input className="dash-search" placeholder="Search products..." value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn-sm gold" disabled={loadingEdit} onClick={() => setEditing(newProductTemplate())}>+ Add Product</button>
-      </div>
-      <div className="panel dash-table-panel">
-        <div className="dash-table-scroll is-scrollable">
-          <table className="dash-table dash-table-pro">
-            <thead>
-              <tr>
-                <th className="col-img">Image</th>
-                <th className="col-name">Product</th>
-                <th className="col-tier">Tier</th>
-                <th className="col-price">Price</th>
-                <th className="col-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="dash-table-empty">No products match your search.</td>
-                </tr>
-              )}
-              {filtered.map((p) => (
-                <tr key={p.id}>
-                  <td className="col-img">
-                    {p.imageUrl ? <img className="tbl-img" src={p.imageUrl} alt="" /> : <span className="tbl-img-placeholder">—</span>}
-                  </td>
-                  <td className="col-name">
-                    <span className="dash-cell-title">{p.name}</span>
-                    {p.tag ? <span className="dash-cell-sub">{p.tag}</span> : null}
-                  </td>
-                  <td className="col-tier">
-                    <span className="badge badge-tier">{TIER_LABELS[p.tier || ''] || p.tier}</span>
-                  </td>
-                  <td className="col-price dash-cell-price">₹{Number(p.price).toLocaleString('en-IN')}</td>
-                  <td className="col-actions dash-cell-actions">
-                    <button type="button" className="btn-sm" disabled={loadingEdit} onClick={() => openEdit(p)}>Edit</button>
-                    <button type="button" className="btn-sm danger" onClick={() => del(p.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {editing && (
-        <ProductEditor
-          product={editing}
-          allProducts={items}
-          onClose={() => setEditing(null)}
-          onSave={save}
+        <input
+          className="dash-search"
+          placeholder="Search products..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
         />
+        <button
+          className="btn-sm gold"
+          disabled={loadingEdit}
+          onClick={() => setEditing(newProductTemplate())}
+        >
+          + Add Product
+        </button>
+      </div>
+
+      <div className="dash-product-grid">
+        {/* Quick Add Product Card Tile */}
+        <div
+          className="dash-product-add-tile"
+          onClick={() => setEditing(newProductTemplate())}
+          role="button"
+          tabIndex={0}
+        >
+          <span style={{ fontSize: 36, color: 'var(--gold-primary)', lineHeight: 1 }}>+</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--gold-light)' }}>
+            Add New Product
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Open live visual show-page creator
+          </span>
+        </div>
+
+        {filtered.map((p) => {
+          const tierLabel = TIER_LABELS[p.tier || ''] || p.tier || 'Premium'
+          return (
+            <div key={p.id} className="dash-product-card">
+              <div className="dash-product-card-img-wrap">
+                {p.imageUrl ? (
+                  <img
+                    src={p.imageUrl}
+                    alt={p.name}
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src =
+                        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240" fill="%231a1a20"><rect width="300" height="240"/><text x="50%" y="50%" fill="%23d4af37" text-anchor="middle" dy=".3em" font-size="14">No Image</text></svg>'
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--text-muted)',
+                      fontSize: 12,
+                    }}
+                  >
+                    No Image Set
+                  </div>
+                )}
+                <span className="dash-product-card-badge">{tierLabel}</span>
+              </div>
+
+              <div className="dash-product-card-body">
+                {p.tag ? <span className="dash-product-card-tag">{p.tag}</span> : null}
+                <h3 className="dash-product-card-title">{p.name}</h3>
+                <p className="dash-product-card-desc">
+                  {p.description || 'No description provided.'}
+                </p>
+
+                <div className="dash-product-card-footer">
+                  <span className="dash-product-card-price">
+                    ₹{Number(p.price).toLocaleString('en-IN')}
+                  </span>
+
+                  <div className="dash-product-card-actions">
+                    {p.slug && (
+                      <a
+                        href={`/products/${p.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-sm"
+                        title="View live product page"
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                      >
+                        ↗
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      className="btn-sm gold"
+                      disabled={loadingEdit}
+                      onClick={() => openEdit(p)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-sm danger"
+                      onClick={() => del(p.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {filtered.length === 0 && (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '60px 20px',
+            color: 'var(--text-muted)',
+            background: 'rgba(255,255,255,0.02)',
+            borderRadius: 16,
+            marginTop: 20,
+          }}
+        >
+          No products match your search &quot;{q}&quot;.
+        </div>
       )}
     </div>
   )

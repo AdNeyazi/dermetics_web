@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
+import { trackLead } from '@/lib/gtag'
 import { CatalogProductCard } from '@/components/storefront/CatalogProductCard'
 import { HOME_TIER_PREVIEW_LIMIT } from '@/lib/catalog'
 import type { Product, Package } from '@/types'
@@ -142,6 +143,13 @@ const ConsultationModal = ({ open, onClose, product, variant }: ConsultationModa
         body: JSON.stringify({ ...form, tier: product ? `${product.tier}${variant ? ` · ${variant}` : ''}` : 'bespoke' }),
       })
       if (!res.ok) throw new Error('failed')
+      trackLead({
+        lead_type: 'bespoke_consultation',
+        metadata: {
+          tier: product ? product.tier : 'bespoke',
+          product: product ? product.name : undefined,
+        },
+      })
       setStatus('success')
     } catch {
       setStatus('error')
@@ -343,6 +351,11 @@ function DiagnosticForm({ consultation, onBack }: DiagnosticFormProps) {
         }),
       })
       if (!res.ok) throw new Error('failed')
+      trackLead({
+        lead_type: 'diagnostic_consultation',
+        value: consultation.fee,
+        currency: 'INR',
+      })
       setStatus('success')
     } catch { setStatus('error') }
   }

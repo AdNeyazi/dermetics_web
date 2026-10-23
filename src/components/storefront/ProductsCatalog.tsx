@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '@/lib/api'
+import { trackViewItemList, trackSearch } from '@/lib/gtag'
 import { CATALOG_TIER_KEYS, filterProductsByQuery, groupProductsByTier } from '@/lib/catalog'
 import { CatalogProductCard } from './CatalogProductCard'
 import type { Product, Category } from '@/types'
@@ -38,7 +39,19 @@ export function ProductsCatalog() {
       apiFetch('/api/categories').then((r) => r.json()),
     ])
       .then(([prods, cats]) => {
-        setProducts(Array.isArray(prods) ? prods : [])
+        const productList = Array.isArray(prods) ? prods : []
+        setProducts(productList)
+        if (productList.length > 0) {
+          trackViewItemList({
+            item_list_name: 'Catalog',
+            items: productList.map((p: Product) => ({
+              item_id: String(p.id),
+              item_name: p.name,
+              price: Number(p.price),
+              item_category: p.tier,
+            })),
+          })
+        }
         if (Array.isArray(cats) && cats.length) {
           const shopCats = cats.filter((c: Category) => CATALOG_TIER_KEYS.includes(c.key))
           setCategories(shopCats.length ? shopCats : DEFAULT_TABS)
@@ -71,6 +84,9 @@ export function ProductsCatalog() {
     const q = value.trim()
     const url = q ? `/products?q=${encodeURIComponent(q)}#${active}` : `/products#${active}`
     window.history.replaceState(null, '', url)
+    if (q.length >= 3) {
+      trackSearch({ search_term: q, results_count: filterProductsByQuery(products, q).length })
+    }
   }
 
   return (

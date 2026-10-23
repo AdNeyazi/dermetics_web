@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { trackSelectItem } from '@/lib/gtag'
 import type { Product } from '@/types'
 
 interface CatalogProductCardProps {
@@ -16,6 +17,18 @@ export function CatalogProductCard({ p, onInquire, className = '' }: CatalogProd
   const img = (hasVariants && p.variants![sel].imageUrl) || p.imageUrl
   const href = p.slug ? `/products/${p.slug}` : null
 
+  const onSelect = () => {
+    trackSelectItem({
+      item: {
+        item_id: String(p.id),
+        item_name: p.name,
+        price: Number(price),
+        item_category: p.tier,
+        item_variant: variantLabel || undefined,
+      },
+    })
+  }
+
   return (
     <div className={`product-card catalog-product-card ${className}`.trim()}>
       <div className="product-img">
@@ -24,7 +37,7 @@ export function CatalogProductCard({ p, onInquire, className = '' }: CatalogProd
       <div className="product-body">
         <span className="product-tag">{p.tag}</span>
         {href ? (
-          <Link to={href} className="product-name-link"><h3 className="product-name">{p.name}</h3></Link>
+          <Link to={href} className="product-name-link" onClick={onSelect}><h3 className="product-name">{p.name}</h3></Link>
         ) : (
           <h3 className="product-name">{p.name}</h3>
         )}

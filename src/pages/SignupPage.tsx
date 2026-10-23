@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { trackAuth, setGAUser } from '@/lib/gtag'
 import { AppHeader } from '@/components/AppHeader'
 
 export function SignupPage() {
@@ -27,6 +28,11 @@ export function SignupPage() {
       setError(typeof res.error === 'string' ? res.error : 'Signup failed')
       setSubmitting(false)
       return
+    }
+
+    trackAuth({ method: 'email', type: 'sign_up' })
+    if (res.user?.id) {
+      setGAUser(res.user.id, { user_role: res.user.role || 'user' })
     }
 
     // New registered users redirect to storefront home

@@ -8,6 +8,7 @@ import { withReferral, getReferralCode } from '@/lib/referral'
 import { toggleWishlist, isWishlisted, subscribeWishlist } from '@/lib/wishlist'
 import { formatMoney, discountPercent } from '@/lib/money'
 import { trackEvent } from '@/lib/track'
+import { trackViewItem, trackAddToCart as trackGAAddToCart, trackAddToWishlist, trackShare } from '@/lib/gtag'
 import { PdpHighlightTabs } from './PdpHighlightTabs'
 import { ProductActionVideos } from './ProductActionVideos'
 import type { Product, ProductVariant, AppliedCoupon } from '@/types'
@@ -77,7 +78,17 @@ export function ProductBuyBox({ product, variantIdx, setVariantIdx }: ProductBuy
 
   useEffect(() => {
     trackEvent('pdp_view', { slug: product.slug, productId: product.id })
-  }, [product.id, product.slug])
+    trackViewItem({
+      item: {
+        item_id: String(product.id),
+        item_name: product.name,
+        price,
+        item_category: product.tier,
+        item_variant: variant.label !== 'Default' ? variant.label : undefined,
+      },
+      value: price,
+    })
+  }, [product.id, product.slug, product.name, product.tier, price, variant.label])
 
   useEffect(() => {
     const el = buyBoxRef.current
@@ -114,6 +125,16 @@ export function ProductBuyBox({ product, variantIdx, setVariantIdx }: ProductBuy
     if (!variant.inStock) return
     addToCart(cartPayload)
     trackEvent('add_to_cart', { slug: product.slug, variant: variant.label, qty })
+    trackGAAddToCart({
+      item: {
+        item_id: String(product.id),
+        item_name: product.name,
+        price,
+        item_variant: variant.label !== 'Default' ? variant.label : undefined,
+        item_category: product.tier,
+      },
+      quantity: qty,
+    })
     setCartOpen?.(true)
   }
 
@@ -121,6 +142,16 @@ export function ProductBuyBox({ product, variantIdx, setVariantIdx }: ProductBuy
     if (!variant.inStock) return
     addToCart(cartPayload)
     trackEvent('buy_now', { slug: product.slug, variant: variant.label, qty })
+    trackGAAddToCart({
+      item: {
+        item_id: String(product.id),
+        item_name: product.name,
+        price,
+        item_variant: variant.label !== 'Default' ? variant.label : undefined,
+        item_category: product.tier,
+      },
+      quantity: qty,
+    })
     navigate('/checkout')
   }
 
@@ -166,17 +197,30 @@ export function ProductBuyBox({ product, variantIdx, setVariantIdx }: ProductBuy
   }
 
   const onToggleWishlist = () => {
+    const nextState = !wishlisted
     toggleWishlist(product.id)
-    setWishlisted(isWishlisted(product.id))
+    setWishlisted(nextState)
+    if (nextState) {
+      trackAddToWishlist({
+        item: {
+          item_id: String(product.id),
+          item_name: product.name,
+          price,
+          item_category: product.tier,
+        },
+      })
+    }
   }
 
   const share = async () => {
     const url = typeof window !== 'undefined' ? withReferral(window.location.href) : ''
     trackEvent('share', { slug: product.slug, platform: 'copy', ref: getReferralCode() || null })
+    trackShare({ method: 'copy', item_id: String(product.id) })
     try {
       if (navigator.share) {
         await navigator.share({ title: product.name, url })
         trackEvent('share', { slug: product.slug, platform: 'native', ref: getReferralCode() || null })
+        trackShare({ method: 'native', item_id: String(product.id) })
         return
       }
       await navigator.clipboard.writeText(url)

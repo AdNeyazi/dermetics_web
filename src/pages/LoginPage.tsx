@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { trackAuth, setGAUser } from '@/lib/gtag'
 import { AppHeader } from '@/components/AppHeader'
 
 export function LoginPage() {
@@ -23,6 +24,11 @@ export function LoginPage() {
       setError(typeof res.error === 'string' ? res.error : 'Login failed')
       setSubmitting(false)
       return
+    }
+
+    trackAuth({ method: 'email', type: 'login' })
+    if (res.user?.id) {
+      setGAUser(res.user.id, { user_role: res.user.role || 'user' })
     }
 
     const state = location.state as { from?: { pathname: string } } | null
