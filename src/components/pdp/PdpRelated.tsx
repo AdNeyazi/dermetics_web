@@ -4,6 +4,7 @@ import { formatMoney } from '@/lib/money'
 import { addToCart } from '@/lib/cart'
 import { useStorefront } from '@/components/storefront/StorefrontContext'
 import { trackEvent } from '@/lib/track'
+import { trackAddToCart } from '@/lib/gtag'
 import type { Product } from '@/types'
 
 function MiniProductCard({ p }: { p: Product }) {
@@ -38,13 +39,24 @@ export function PdpRelated({ product, bundleProducts }: PdpRelatedProps) {
     bundle.forEach((bp: any) => {
       const label = bp.bundleVariantLabel || bp.variants?.[0]?.label || ''
       const variant = bp.variants?.find((v: any) => v.label === label) || bp.variants?.[0]
-      addToCart({
+      const line = {
         productId: bp.id,
         slug: bp.slug,
         name: bp.name,
         variantLabel: label && label !== 'Default' ? label : '',
         price: Number(variant?.price ?? bp.price),
         imageUrl: variant?.imageUrl || bp.imageUrl,
+        quantity: 1,
+      }
+      addToCart(line)
+      trackAddToCart({
+        item: {
+          item_id: String(line.productId),
+          item_name: line.name,
+          price: line.price,
+          item_variant: line.variantLabel || undefined,
+          item_category: bp.tier,
+        },
         quantity: 1,
       })
     })

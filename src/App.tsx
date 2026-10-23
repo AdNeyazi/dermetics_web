@@ -16,6 +16,9 @@ import WishlistPage from '@/pages/WishlistPage'
 import LoginPage from '@/pages/LoginPage'
 import SignupPage from '@/pages/SignupPage'
 
+import { GoogleAnalyticsTracker } from '@/components/analytics/GoogleAnalyticsTracker'
+import { CookieConsentBanner } from '@/components/analytics/CookieConsentBanner'
+
 // Admin dashboard
 import DashboardPage from '@/pages/DashboardPage'
 
@@ -46,6 +49,8 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <GoogleAnalyticsTracker />
+          <CookieConsentBanner />
           <Routes>
             {/* Storefront Layout */}
             <Route element={<StorefrontLayout />}>

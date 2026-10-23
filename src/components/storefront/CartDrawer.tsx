@@ -12,6 +12,7 @@ import {
 } from '@/lib/cart'
 import { validateCoupon } from '@/lib/checkout'
 import { formatMoney } from '@/lib/money'
+import { trackViewCart, trackAddToCart, trackRemoveFromCart } from '@/lib/gtag'
 import { useStorefront } from './StorefrontContext'
 import type { CartLine, AppliedCoupon } from '@/types'
 
@@ -34,12 +35,40 @@ export function CartDrawer() {
     return subscribeCart(sync)
   }, [])
 
+  const changeQuantity = (line: CartLine, delta: 1 | -1) => {
+    const current = line.quantity || 1
+    // updateLineQuantity clamps to 1..99, so a click at the bounds changes nothing
+    if (current + delta < 1 || current + delta > 99) return
+    const item = {
+      item_id: String(line.productId),
+      item_name: line.name,
+      price: Number(line.price),
+      item_variant: line.variantLabel,
+    }
+    if (delta > 0) trackAddToCart({ item, quantity: 1 })
+    else trackRemoveFromCart({ item, quantity: 1 })
+    updateLineQuantity(line.id, current + delta)
+  }
+
   useEffect(() => {
     if (!open) return undefined
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen?.(false) }
     window.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
     sync()
+    const currentLines = readCart()
+    if (currentLines.length > 0) {
+      trackViewCart({
+        items: currentLines.map((l) => ({
+          item_id: String(l.productId),
+          item_name: l.name,
+          price: Number(l.price),
+          quantity: Number(l.quantity) || 1,
+          item_variant: l.variantLabel,
+        })),
+        value: cartSubtotal(currentLines),
+      })
+    }
     return () => {
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
@@ -103,13 +132,29 @@ export function CartDrawer() {
                       {line.variantLabel ? <span className="cart-line-variant">{line.variantLabel}</span> : null}
                       <span className="gold-text cart-line-price">{formatMoney(line.price)}</span>
                       <div className="cart-line-stepper">
-                        <button type="button" aria-label="Decrease" onClick={() => updateLineQuantity(line.id, (line.quantity || 1) - 1)}>−</button>
+                        <button type="button" aria-label="Decrease" onClick={() => changeQuantity(line, -1)}>−</button>
                         <span>{line.quantity || 1}</span>
-                        <button type="button" aria-label="Increase" onClick={() => updateLineQuantity(line.id, (line.quantity || 1) + 1)}>+</button>
+                        <button type="button" aria-label="Increase" onClick={() => changeQuantity(line, 1)}>+</button>
                       </div>
                     </div>
                   </div>
-                  <button type="button" className="cart-line-remove" onClick={() => removeLine(line.id)} aria-label="Remove">×</button>
+                  <button
+                    type="button"
+                    className="cart-line-remove"
+                    onClick={() => {
+                      trackRemoveFromCart({
+                        item: {
+                          item_id: String(line.productId),
+                          item_name: line.name,
+                          price: Number(line.price),
+                          item_variant: line.variantLabel,
+                        },
+                        quantity: Number(line.quantity) || 1,
+                      })
+                      removeLine(line.id)
+                    }}
+                    aria-label="Remove"
+                  >×</button>
                 </li>
               ))}
             </ul>

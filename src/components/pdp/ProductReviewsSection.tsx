@@ -4,6 +4,7 @@ import { apiFetch } from '@/lib/api'
 import { fetchMyOrders } from '@/lib/checkout'
 import { Stars } from './pdp-ui'
 import { trackEvent } from '@/lib/track'
+import { trackReviewSubmitted } from '@/lib/gtag'
 import { formatDisplayDate } from '@/lib/formatDate'
 import type { Product, User } from '@/types'
 
@@ -56,6 +57,7 @@ export function ProductReviewsSection({ product }: { product: Product }) {
       setMsg(data.message || 'Review submitted for moderation.')
       setForm({ rating: 5, title: '', body: '' })
       trackEvent('pdp_review_submitted', { slug: product.slug, rating: form.rating })
+      trackReviewSubmitted({ product_slug: product.slug, rating: form.rating })
     } catch (err: any) {
       setStatus('error')
       setMsg(err.message || 'Something went wrong')

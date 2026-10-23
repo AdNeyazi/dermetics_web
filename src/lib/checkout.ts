@@ -1,5 +1,6 @@
 import { apiFetch } from '@/lib/api'
 import { getReferralCode } from '@/lib/referral'
+import { getSid } from '@/lib/track'
 import type { CartLine, Order } from '@/types'
 
 export interface PlaceOrderInput {
@@ -32,6 +33,7 @@ export async function placeOrder({ items, shipping, couponCode, paymentMethod }:
       couponCode: couponCode || '',
       referralCode: getReferralCode(),
       paymentMethod: paymentMethod || 'cod',
+      sessionId: getSid(),
     }),
   })
   const data = await res.json()

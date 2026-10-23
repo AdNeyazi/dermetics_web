@@ -4,8 +4,9 @@ import { ProductGallery } from './ProductGallery'
 import { ProductBuyBox } from './ProductBuyBox'
 import { PdpBelowFold } from './PdpBelowFold'
 import { GuaranteeStrip } from './GuaranteeStrip'
-import { addProductToCart, getVariants } from '@/lib/pdp'
+import { addProductToCart, buildCartLine, getVariants } from '@/lib/pdp'
 import { trackEvent } from '@/lib/track'
+import { trackAddToCart } from '@/lib/gtag'
 import type { Product } from '@/types'
 
 export interface ProductDetailClientProps {
@@ -22,7 +23,19 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
 
   const handleAddToCart = useCallback((qty = 1) => {
     const ok = addProductToCart(product, variantIdx, qty, setCartOpen)
-    if (ok) trackEvent('add_to_cart', { slug: product.slug, source: 'pdp_strip' })
+    if (!ok) return
+    trackEvent('add_to_cart', { slug: product.slug, source: 'pdp_strip' })
+    const line = buildCartLine(product, variantIdx, qty)
+    trackAddToCart({
+      item: {
+        item_id: String(product.id),
+        item_name: product.name,
+        price: line.price,
+        item_variant: line.variantLabel || undefined,
+        item_category: product.tier,
+      },
+      quantity: line.quantity,
+    })
   }, [product, variantIdx, setCartOpen])
 
   return (
